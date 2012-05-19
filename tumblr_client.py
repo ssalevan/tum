@@ -62,7 +62,10 @@ def generate_tumblr_credentials(credfile_loc):
       access_token["oauth_token_secret"])
   with open(credfile_loc, "wb") as credfile:
     config.write(credfile)
-
   print("Hooray!  Successfully stored Tumblr credentials at: %s" % credfile_loc)
-  
-generate_tumblr_credentials("/home/ssalevan/.tum_creds")
+
+
+class TumblrClient(object):
+  def __init__(self, oauth_token, oauth_token_secret):
+    self.oauth_token = oauth_token
+    self.oauth_token_secret = oauth_token_secret
