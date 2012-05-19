@@ -50,7 +50,7 @@ class CLIHandler(object):
   def _usage(self):
     print("Usage: tum ACTION --help")
     print("Actions:")
-    for module in CLI_MODULES:
+    for module in CLI_MODULES.keys():
       print("  %s - %s" % (module, CLI_MODULES[module][1]))  
 
 
@@ -81,21 +81,78 @@ class PostModule(BaseModule):
   """
   Contains Tumblr post functionality
   """
+
+  def audio_options(parser):
+    group = OptionGroup(parser, "Audio Post Options",
+        "To post one or more audio files, supply a list of URLs and/or "
+        "filenames like thus, or read from STDIN: \n"
+        "  # tum post audio ./sussudio.mp3 http://philcollins.com/phil.wav")
+    group.add_option("-c", "--caption", dest="caption", help="post caption",
+        metavar="CAPTION")
+    parser.add_option_group(group)
+
+  def chat_options(parser):
+    group = OptionGroup(parser, "Chat Post Options")
+    group.add_option("-t", "--title", dest="title", help="post title",
+        metavar="TITLE")
+    parser.add_option_group(group)
+
+  def code_options(parser):
+    group = OptionGroup(parser, "Code Post Options")
+    group.add_option("-t", "--title", dest="title", help="post title",
+        metavar="TITLE")
+    group.add_option("-d", "--disable-autocolor", dest="autocolor",
+        action="store_true", default=False,
+        help="disable the autocolorization of code")
+    parser.add_option_group(group)
+
+  def link_options(parser):
+    group = OptionGroup(parser, "Link Post Options")
+    group.add_option("-d", "--description", dest="description",
+        help="post description", metavar="DESCRIPTION")
+    group.add_option("-t", "--title", dest="title", help="post title",
+        metavar="TITLE")
+    parser.add_option_group(group)
+
+  def photo_options(parser):
+    group = OptionGroup(parser, "Photo Post Options",
+        "To post one or more photos, supply a list of URLs and/or filenames "
+        "like thus, or read from STDIN: \n"
+        "  # tum post photo ./photo1.jpg http://philcollins.com/photo2.jpg")
+    group.add_option("-c", "--caption", dest="caption", help="post caption",
+        metavar="CAPTION")
+    group.add_option("-l", "--link", dest="link",
+        help="the click-through URL for the photo", metavar="LINK")
+
+  def text_options(parser):
+    group = OptionGroup(parser, "Text Post Options")
+    group.add_option("-t", "--title", dest="title", help="post title",
+        metavar="TITLE")
+    parser.add_option_group(group)
   
-  POST_TYPES = set([
-    "answer",
-    "audio",
-    "chat",
-    "code",
-    "link",
-    "text",
-    "photo",
-    "video",
-  ])
+  
+  POST_TYPES = {
+    "audio": audio_options,
+    "chat": chat_options,
+    "code": code_options,
+    "link": link_options,
+    "photo": photo_options,
+    "quote": quote_options,
+    "text": text_options,
+    "video": video_options,
+  }
 
 
   def __init__(self):
-    BaseModule.__init__(self, "usage: %prog post <type> [content] [options]")
+    BaseModule.__init__(self, "usage: %prog post <type> [options] <content>")
+    if argv[1] not in POST_TYPES:
+      self.parser.print_usage()
+      print("Error: Post type not recognized, available post types are: "
+            "%s" % ", ".join(POST_TYPES.keys()))
+      sys.exit(1)
+    # Adds post-specific option parsing to parser.
+    POST_TYPES[argv[1]](self.parser)
+          
   
   def main(self, argv):
     
