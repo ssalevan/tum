@@ -114,6 +114,7 @@ class TumError(Exception):
 
 class CLIHandler(object):
   """
+  Handles basic error checking and initializes the requested tum module.
   """
   
   def main(self, argv):
@@ -181,8 +182,8 @@ class BaseModule(object):
 
     # Initializes the Tumblr client.
     self.tumblr_client = tumblr_client.TumblrClient(
-        self.tum_cred.get("Credentials", "oauth_token"),
-        self.tum_cred.get("Credentials", "oauth_token_secret"))
+        self.tum_creds.get("Credentials", "oauth_token"),
+        self.tum_creds.get("Credentials", "oauth_token_secret"))
 
 
 class PostModule(BaseModule):
