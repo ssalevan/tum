@@ -33,6 +33,15 @@ DEFAULT_TUMBLR_API_URL = "https://%s/v2/%s"
 # Contains the default editor used by this environment.
 EDITOR = os.environ.get("EDITOR", "vim")
 
+# What can I say, I'm a sucker for ASCII art.
+TUM_LOGO = """    .                                     
+  .o8                                     
+.o888oo oooo  oooo  ooo. .oo.  .oo.       
+  888   `888  `888  `888P"Y88bP"Y88b      
+  888    888   888   888   888   888      
+  888 .  888   888   888   888   888   
+  "888"  `V88V"V8P' o888o o888o o888o .o."""
+
 
 def AudioOptions(parser):
   """
@@ -146,7 +155,8 @@ class CLIHandler(object):
     return module.main(argv)
 
   def _usage(self):
-    print("Usage: tum ACTION --help")
+    print(TUM_LOGO + "\n")
+    print("Usage: tum ACTION --help\n")
     print("Actions:")
     for module in CLI_MODULES.keys():
       print("  %s - %s" % (module, CLI_MODULES[module][1]))  
@@ -167,12 +177,11 @@ class BaseModule(object):
 
   def _add_common_options(self):
     self.parser.add_option("-s", "--server", dest="server",
-        help="use this Tumblr server", metavar="SERVER",
+        help="use this Tumblr API server", metavar="SERVER",
         default=DEFAULT_TUMBLR_API_SERVER)
     self.parser.add_option("-x", "--credentials", dest="credentials",
-        help="use this Tumblr credentials file", metavar="CREDFILE")
-    self.parser.add_option("-i", "--stdin", dest="stdin",
-        action="store_true", default=False, help="read input from STDIN")
+        help="specifies a custom location for the credentials file",
+        metavar="CREDFILE")
     self.parser.add_option("-q", "--quiet", dest="quiet",
         action="store_true", default=False, help="enable quiet mode")
 
@@ -233,13 +242,15 @@ class PostModule(BaseModule):
   """
 
   def __init__(self):
-    BaseModule.__init__(self, "usage: %prog post <type> [options] <content>",
+    BaseModule.__init__(self, "usage: %prog post [options] <type> <content>",
         "The post module allows you to post many different types of content to "
         "Tumblr from the command line.  In cases where you're posting content "
         "which must be uploaded, files on the local system and URLs are "
         "interchangeable, and depending upon the type of post, multiple files "
         "may be posted.  For instance:\n\n"
         " # tum post photo tony_banks.jpg http://genesis.com/philcollins.jpg")
+    self.parser.add_option("-i", "--stdin", dest="stdin",
+        action="store_true", default=False, help="read input from STDIN")
 
   def main(self, argv):
     if len(argv) < 2 or argv[1] not in POST_TYPES:
