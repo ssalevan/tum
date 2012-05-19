@@ -17,17 +17,21 @@ import ConfigParser
 import httplib2
 import os
 import sys
+import tempfile
 import urllib
 
 from optparse import OptionParser
 
-# Various defaults for
+# Contains various defaults for
 DEFAULT_TUMBLR_API_CREDFILE = ".tum_creds"
 DEFAULT_TUMBLR_API_SERVER = "api.tumblr.com"
 DEFAULT_TUMBLR_API_URL = "https://%s/v2/%s"
 
+# 
+EDITOR = os.environ.get("EDITOR", "vim")
 
-# Modules supported by tum
+
+# Contains the Tumblr interaction modules supported by tum.
 CLI_MODULES = {
   "dash": (DashModule, "open your dashboard"),
   "post": (PostModule, "make a post"),
@@ -59,8 +63,8 @@ class BaseModule(object):
   Contains code used by all CLI-handing modules.
   """
   
-  def __init__(self, usage):
-    self.parser = OptionParser(usage)
+  def __init__(self, usage, description):
+    self.parser = OptionParser(usage, description=description)
     self._add_common_options()
     
   def _add_common_options(self):
@@ -79,14 +83,11 @@ class BaseModule(object):
 
 class PostModule(BaseModule):
   """
-  Contains Tumblr post functionality
+  Contains handlers for posting content via the Tumblr API.
   """
 
   def audio_options(parser):
-    group = OptionGroup(parser, "Audio Post Options",
-        "To post one or more audio files, supply a list of URLs and/or "
-        "filenames like thus, or read from STDIN: \n"
-        "  # tum post audio ./sussudio.mp3 http://philcollins.com/phil.wav")
+    group = OptionGroup(parser, "Audio Post Options")
     group.add_option("-c", "--caption", dest="caption", help="post caption",
         metavar="CAPTION")
     parser.add_option_group(group)
@@ -103,7 +104,7 @@ class PostModule(BaseModule):
         metavar="TITLE")
     group.add_option("-d", "--disable-autocolor", dest="autocolor",
         action="store_true", default=False,
-        help="disable the autocolorization of code")
+        help="disable the auto-colorization of code")
     parser.add_option_group(group)
 
   def link_options(parser):
@@ -116,35 +117,47 @@ class PostModule(BaseModule):
 
   def photo_options(parser):
     group = OptionGroup(parser, "Photo Post Options",
-        "To post one or more photos, supply a list of URLs and/or filenames "
-        "like thus, or read from STDIN: \n"
-        "  # tum post photo ./photo1.jpg http://philcollins.com/photo2.jpg")
+        "One or more photos can be posted
     group.add_option("-c", "--caption", dest="caption", help="post caption",
         metavar="CAPTION")
     group.add_option("-l", "--link", dest="link",
         help="the click-through URL for the photo", metavar="LINK")
+    parser.add_option_group(group)
 
   def text_options(parser):
     group = OptionGroup(parser, "Text Post Options")
     group.add_option("-t", "--title", dest="title", help="post title",
         metavar="TITLE")
     parser.add_option_group(group)
+
+  def video_options(parser):
+    group = OptionGroup(parser, "Video Post Options")
+    group.add_option("-c", "--caption", dest="caption", help="post caption",
+        metavar="CAPTION")
+    parser.add_option_group(group)
   
-  
+  # Contains all valid Tumblr post types.
   POST_TYPES = {
     "audio": audio_options,
     "chat": chat_options,
     "code": code_options,
     "link": link_options,
     "photo": photo_options,
-    "quote": quote_options,
+    "quote": lambda f: (),
     "text": text_options,
     "video": video_options,
   }
 
-
   def __init__(self):
-    BaseModule.__init__(self, "usage: %prog post <type> [options] <content>")
+    BaseModule.__init__(self, "usage: %prog post <type> [options] <content>",
+      "The post module allows you to post many different types of content to "
+      "Tumblr from the command line.  In cases where you're posting content "
+      "which must be uploaded, files on the local system and URLs are "
+      "interchangeable, and depending upon the type of post, multiple files "
+      "may be posted.  For instance:\n\n"
+      " # tum post photo tony_banks.jpg http://genesis.com/philcollins.jpg\n\n"
+      "For more information per post type, run a tum post <type> --help.")
+       
     if argv[1] not in POST_TYPES:
       self.parser.print_usage()
       print("Error: Post type not recognized, available post types are: "
@@ -152,8 +165,6 @@ class PostModule(BaseModule):
       sys.exit(1)
     # Adds post-specific option parsing to parser.
     POST_TYPES[argv[1]](self.parser)
-          
-  
+
   def main(self, argv):
-    
     
