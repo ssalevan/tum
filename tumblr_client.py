@@ -3,8 +3,9 @@
 # tumblr_client
 
 import ConfigParser
-import urlparse
 import oauth2 as oauth
+import os
+import urlparse
 
 
 # Contains default URLs for authorizing to Tumblr's OAuth API.
@@ -13,7 +14,7 @@ AUTHORIZE_URL = "http://www.tumblr.com/oauth/authorize"
 ACCESS_TOKEN_URL = "http://www.tumblr.com/oauth/access_token"
 
 
-def generate_tumblr_credentials(credfile_loc):
+def GenerateTumblrCredentials(credfile_loc):
   print("To enable communication with Tumblr, we must first register tum as")
   print("an OAuth app.  To do so, log into Tumblr and visit this URL:\n")
   print("http://www.tumblr.com/oauth/register\n")
@@ -62,6 +63,8 @@ def generate_tumblr_credentials(credfile_loc):
       access_token["oauth_token_secret"])
   with open(credfile_loc, "wb") as credfile:
     config.write(credfile)
+  # Gives the credentials file some sane file permissions.
+  os.chmod(credfile_loc, 0600)
   print("Hooray!  Successfully stored Tumblr credentials at: %s" % credfile_loc)
 
 
