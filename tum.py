@@ -6,14 +6,13 @@
 #
 # Tumblr is a great site, but I thought that it'd be more awesome if you could
 # use its power a bit more like a mutant hybrid of git and mutt.  If you feel
-# similarly, tum may just be right up your alley.
+# similarly, tum might just be right up your alley.
 #
 # Special thanks go to dgoodwin@redhat.com, as much of the command-line handling
 # was based off of patterns found in Tito (https://github.com/dgoodwin/tito).
 # RHN fo'lyfe, yall.
 
 import ConfigParser
-import httplib2
 import os
 import sys
 import tempfile
@@ -25,10 +24,12 @@ from optparse import OptionParser
 # tum module-specific imports
 import tumblr_client
 
-# Contains various defaults for
-DEFAULT_TUMBLR_API_CREDFILE = ".tum_creds"
+# Contains various defaults for interacting with the Tumblr API.
+DEFAULT_TUM_CREDFILE = ".tum_creds"
+DEFAULT_TUMRC = ".tumrc"
+
+# Contains the default Tumblr API server to point tum at.
 DEFAULT_TUMBLR_API_SERVER = "api.tumblr.com"
-DEFAULT_TUMBLR_API_URL = "https://%s/v2/%s"
 
 # Contains the default editor used by this environment.
 EDITOR = os.environ.get("EDITOR", "vim")
@@ -39,8 +40,8 @@ TUM_LOGO = """    .
 .o888oo oooo  oooo  ooo. .oo.  .oo.       
   888   `888  `888  `888P"Y88bP"Y88b      
   888    888   888   888   888   888      
-  888 .  888   888   888   888   888   
-  "888"  `V88V"V8P' o888o o888o o888o .o."""
+  888 .  888   888   888   888   888  
+  "888"  `V88V"V8P' o888o o888o o888o #"""
 
 
 def AudioOptions(parser):
@@ -177,7 +178,7 @@ class BaseModule(object):
 
   def _add_common_options(self):
     self.parser.add_option("-s", "--server", dest="server",
-        help="use this Tumblr API server", metavar="SERVER",
+        help="specifies a custom Tumblr API server", metavar="SERVER",
         default=DEFAULT_TUMBLR_API_SERVER)
     self.parser.add_option("-x", "--credentials", dest="credentials",
         help="specifies a custom location for the credentials file",
@@ -194,13 +195,18 @@ class BaseModule(object):
     (self.options, self.args) = self.parser.parse_args(argv)
 
     # Figures out where the OAuth credentials file should land
-    credfile_loc = "%s/%s" % (os.getenv("HOME"), DEFAULT_TUMBLR_API_CREDFILE)
+    credfile_loc = "%s/%s" % (os.getenv("HOME"), DEFAULT_TUM_CREDFILE)
     if self.options.credentials:
       credfile_loc = self.options.credentials
     # Authenticates to Tumblr OAuth API if no credential file exists.
     if not os.path.exists(credfile_loc):
-      print("ERROR: no Tumblr credentials file found.  Authenticating...")
-      tumblr_client.GenerateTumblrCredentials(credfile_loc)
+      print("ERROR: no Tumblr credentials file found at %s." % credfile_loc)
+      try:
+        tumblr_client.GenerateTumblrCredentials(credfile_loc)
+      except TumError, e:
+        print("An error occurred while reading your credentials file:")
+        print(e.message)
+        sys.exit(-1)
     try:
       self._read_credentials(credfile_loc)
     except Exception, e:
@@ -210,8 +216,10 @@ class BaseModule(object):
 
     # Initializes the Tumblr client.
     self.tumblr_client = tumblr_client.TumblrClient(
+        self.tum_creds.get("Credentials", "api_key"),
         self.tum_creds.get("Credentials", "oauth_token"),
-        self.tum_creds.get("Credentials", "oauth_token_secret"))
+        self.tum_creds.get("Credentials", "oauth_token_secret"),
+        self.options.server)
 
 
 class AuthModule(BaseModule):
@@ -229,10 +237,23 @@ class AuthModule(BaseModule):
     # Parses command-line arguments.
     (self.options, self.args) = self.parser.parse_args(argv)
     # Figures out where the OAuth credentials file should land
-    credfile_loc = "%s/%s" % (os.getenv("HOME"), DEFAULT_TUMBLR_API_CREDFILE)
+    credfile_loc = "%s/%s" % (os.getenv("HOME"), DEFAULT_TUM_CREDFILE)
     if self.options.credentials:
       credfile_loc = self.options.credentials
-    tumblr_client.GenerateTumblrCredentials(credfile_loc)
+    # Prompts the user if the file already exists.
+    if os.path.exists(credfile_loc):
+      print("Warning: a credentials file already exists at %s." % credfile_loc)
+      overwrite = ""
+      while not (overwrite.lower() == "y") or (overwrite.lower() == "n"):
+        overwrite = raw_input("Overwrite? (y/n)> ")
+      if overwrite == "n":
+        sys.exit(0)
+    try:
+      tumblr_client.GenerateTumblrCredentials(credfile_loc)
+    except TumError, e:
+      print("ERROR: Tumblr OAuth authentication failed:")
+      print(e.message)
+      sys.exit(-1)
     sys.exit(0)
 
 
@@ -249,8 +270,18 @@ class PostModule(BaseModule):
         "interchangeable, and depending upon the type of post, multiple files "
         "may be posted.  For instance:\n\n"
         " # tum post photo tony_banks.jpg http://genesis.com/philcollins.jpg")
+    self.parser.add_option("-b", "--blog", dest="blog",
+        metavar="BLOG", help="specifies a blog")
     self.parser.add_option("-i", "--stdin", dest="stdin",
         action="store_true", default=False, help="read input from STDIN")
+    self.parser.add_option("-S", "--state", dest="state",
+        default="published", metavar="STATE",
+        help="the state of the post: published, draft, queue")
+    self.parser.add_option("-T", "--tags", dest="tags",
+        metavar="TAGS", help="comma-separated tags for this post")
+
+  def _get_file(self, argv):
+    return open(argv[2], 'r').read()
 
   def main(self, argv):
     if len(argv) < 2 or argv[1] not in POST_TYPES:
@@ -261,6 +292,21 @@ class PostModule(BaseModule):
     # Adds post-specific option parsing to parser.
     POST_TYPES[argv[1]](self.parser)
     BaseModule.main(self, argv)
+    # Populates a request to the API and sends it.
+    post_params = {}
+    post_params["type"] = argv[1]
+    if self.parser.state:
+      post_params["state"] = self.parser.state
+    if self.parser.tags:
+      post_params["tags"] = self.parser.tags
+    if "text" in post_params["type"]:
+      if self.parser.title:
+        post_params["title"] = self.parser.title
+      if self.parser.stdin:
+        post_params["body"] = sys.stdin.read()
+      else:
+        post_params["body"] = self._get_file(argv[2])
+    self.tumblr_client.create_post(self.parser.blog, post_params)
 
 
 # Contains the Tumblr interaction modules supported by tum.
