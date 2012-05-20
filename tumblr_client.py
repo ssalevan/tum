@@ -21,11 +21,23 @@ DEFAULT_CACHE_LOC = ".tum_cache"
 
 TUMBLR_API_URL = "http://%s/v2/%s"
 
+
 def GenerateTumblrCredentials(credfile_loc):
+  """
+  Interactively generates OAuth credentials.
+  
+  Args:
+    credfile_loc - location of credentials file to be generated
+    
+  Returns:
+    consumer_key - string containing Tumblr API key
+    access_token - dictionary containing OAuth client token returned by Tumblr
+  """
+  
   print("To enable communication with Tumblr, we must first register tum as")
   print("an OAuth app.  To do so, log into Tumblr and visit this URL:\n")
   print("http://www.tumblr.com/oauth/register\n")
-  print("Enter anything you want into the fields then find the following info:")
+  print("Enter anything you want, register, then find the following info:")
 
   consumer_key = raw_input("OAuth Consumer Key> ")
   consumer_secret = raw_input("Secret Key> ")
@@ -43,11 +55,12 @@ def GenerateTumblrCredentials(credfile_loc):
   print("piece of information we need, the oauth_verifier.  Go to the")
   print("following link in your browser and authorize me:\n")
   print("%s?oauth_token=%s\n" % (AUTHORIZE_URL, request_token['oauth_token']))
-  print("This will redirect you to a page at your local host, and within the")
-  print("URL bar you should see something that says oauth_verifier=<stuff>.\n")
-  print("Copy this information down, as you'll need it in the next step.\n")
+  print("This will redirect you to a nonexistent page at http://localhost/hub")
+  print("and within the URL bar you should see an argument that looks like ")
+  print("this: oauth_verifier=value.  Copy this value down, as you'll need it ")
+  print("in the next step.\n")
 
-  oauth_verifier = raw_input("Enter the oauth_verifier from your URL bar> ")
+  oauth_verifier = raw_input("Enter the oauth_verifier value> ")
 
   token = oauth.Token(request_token['oauth_token'],
       request_token['oauth_token_secret'])
@@ -57,7 +70,7 @@ def GenerateTumblrCredentials(credfile_loc):
   resp, content = client.request(ACCESS_TOKEN_URL, "POST")
   access_token = dict(urlparse.parse_qsl(content))
 
-  # Stores credentials into a config file at the supplied location
+  # Stores credentials into a config file at the supplied location.
   config = ConfigParser.RawConfigParser()
   config.add_section("Credentials")
   config.set("Credentials", "api_key", consumer_key)
@@ -69,6 +82,7 @@ def GenerateTumblrCredentials(credfile_loc):
   # Gives the credentials file some sane file permissions.
   os.chmod(credfile_loc, 0600)
   print("Huzzah!  Successfully stored Tumblr credentials at: %s" % credfile_loc)
+  return consumer_key, access_token
 
 
 class TumblrClient(object):
@@ -78,19 +92,37 @@ class TumblrClient(object):
 
   def __init__(self, api_key, oauth_token, oauth_token_secret,
       api_server, cache_loc=None):
+    """
+    Initializes 
+    
+    Args:
+      api_key - string containing Tumblr API key
+      oauth_token - string containing public OAuth token
+      oauth_token_secret - string containing OAUth token secret
+      api_server - string containing hostname of Tumblr API server to
+    """
+
     self.api_key = api_key
     self.api_server = api_server
     self.oauth_token = oauth_token
     self.oauth_token_secret = oauth_token_secret
+    self.consumer = oauth.Consumer(key=self.oauth_token,
+        secret=self.oauth_token_secret)
     if not cache_loc:
       cache_loc = "%s/%s" % (os.getenv("HOME"), DEFAULT_CACHE_LOC)
     if not os.path.exists(cache_loc):
       os.mkdir(cache_loc)
-    self.http_client = oauth.Client(
-        oauth.Consumer(key=self.oauth_token, secret=self.oauth_token_secret),
-        cache=cache_loc)
+    self.http_client = oauth.Client(self.consumer, cache=cache_loc)
 
   def create_post(self, blog, params={}):
+    """
+    Creates a post at the supplied blog address.
+    
+    Args:
+      blog - string containing the name of the blog to create a post against
+      params - dictionary containing parameters 
+    """
+
     req_url = TUMBLR_API_URL % (self.api_server, "blog/%s/post" % blog)
     resp, content = self.http_client.request(
         req_url, method="POST", body=urllib.urlencode(params))

@@ -236,7 +236,7 @@ class AuthModule(BaseModule):
   def main(self, argv):
     # Parses command-line arguments.
     (self.options, self.args) = self.parser.parse_args(argv)
-    # Figures out where the OAuth credentials file should land
+    # Figures out where the OAuth credentials file should land.
     credfile_loc = "%s/%s" % (os.getenv("HOME"), DEFAULT_TUM_CREDFILE)
     if self.options.credentials:
       credfile_loc = self.options.credentials
@@ -248,6 +248,7 @@ class AuthModule(BaseModule):
         overwrite = raw_input("Overwrite? (y/n)> ")
       if overwrite == "n":
         sys.exit(0)
+    # Generates OAuth credentials.
     try:
       tumblr_client.GenerateTumblrCredentials(credfile_loc)
     except TumError, e:
