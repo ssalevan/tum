@@ -11,7 +11,7 @@
 # Special thanks go to dgoodwin@redhat.com, as much of the command-line handling
 # was based off of patterns found in Tito (https://github.com/dgoodwin/tito).
 # RHN fo'lyfe, yall.
-
+import pdb
 import ConfigParser
 import os
 import sys
@@ -272,7 +272,7 @@ class PostModule(BaseModule):
         " # tum post photo tony_banks.jpg http://genesis.com/philcollins.jpg")
     self.parser.add_option("-b", "--blog", dest="blog",
         metavar="BLOG", help="specifies a blog")
-    self.parser.add_option("-i", "--stdin", dest="stdin",
+    self.parser.add_option("-I", "--stdin", dest="stdin",
         action="store_true", default=False, help="read input from STDIN")
     self.parser.add_option("-S", "--state", dest="state",
         default="published", metavar="STATE",
@@ -280,8 +280,8 @@ class PostModule(BaseModule):
     self.parser.add_option("-T", "--tags", dest="tags",
         metavar="TAGS", help="comma-separated tags for this post")
 
-  def _get_file(self, argv):
-    return open(argv[2], 'r').read()
+  def _get_file(self, file_loc):
+    return open(file_loc, 'r').read()
 
   def main(self, argv):
     if len(argv) < 2 or argv[1] not in POST_TYPES:
@@ -294,19 +294,20 @@ class PostModule(BaseModule):
     BaseModule.main(self, argv)
     # Populates a request to the API and sends it.
     post_params = {}
-    post_params["type"] = argv[1]
-    if self.parser.state:
-      post_params["state"] = self.parser.state
-    if self.parser.tags:
-      post_params["tags"] = self.parser.tags
+    post_params["type"] = self.args[1]
+    #pdb.set_trace()
+    if self.options.state:
+      post_params["state"] = self.options.state
+    if self.options.tags:
+      post_params["tags"] = self.options.tags
     if "text" in post_params["type"]:
-      if self.parser.title:
-        post_params["title"] = self.parser.title
-      if self.parser.stdin:
+      if self.options.title:
+        post_params["title"] = self.options.title
+      if self.options.stdin:
         post_params["body"] = sys.stdin.read()
       else:
-        post_params["body"] = self._get_file(argv[2])
-    self.tumblr_client.create_post(self.parser.blog, post_params)
+        post_params["body"] = self._get_file(self.args[2])
+    self.tumblr_client.create_post(self.options.blog, post_params)
 
 
 # Contains the Tumblr interaction modules supported by tum.

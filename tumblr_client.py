@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # tumblr_client
-
+import pdb
 import ConfigParser
 import httplib2
 import oauth2 as oauth
@@ -19,7 +19,7 @@ ACCESS_TOKEN_URL = "http://www.tumblr.com/oauth/access_token"
 # Contains the default location for the cache of all Tumblr content.
 DEFAULT_CACHE_LOC = ".tum_cache"
 
-TUMBLR_API_URL = "https://%s/v2/%s"
+TUMBLR_API_URL = "http://%s/v2/%s"
 
 def GenerateTumblrCredentials(credfile_loc):
   print("To enable communication with Tumblr, we must first register tum as")
@@ -84,14 +84,17 @@ class TumblrClient(object):
     self.oauth_token_secret = oauth_token_secret
     if not cache_loc:
       cache_loc = "%s/%s" % (os.getenv("HOME"), DEFAULT_CACHE_LOC)
+    if not os.path.exists(cache_loc):
+      os.mkdir(cache_loc)
     self.http_client = oauth.Client(
-        oauth.Consumer(self.api_key, self.oauth_token_secret),
+        oauth.Consumer(key=self.oauth_token, secret=self.oauth_token_secret),
         cache=cache_loc)
 
   def create_post(self, blog, params={}):
+    req_url = TUMBLR_API_URL % (self.api_server, "blog/%s/post" % blog)
     resp, content = self.http_client.request(
-        TUMBLR_API_URL % (api_server, "/blog/%s/post" % blog),
-        method="POST", body=urlencode(params))
+        req_url, method="POST", body=urllib.urlencode(params))
+    pdb.set_trace()
     if resp['status'] != '200':
       raise TumError(
           "Post creation failed (HTTP %s): %s" % (resp['status'], content))
